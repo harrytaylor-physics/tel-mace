@@ -11,7 +11,8 @@ drifts into.
 `check_state` is ASE's recalculation trigger: whatever it returns non-empty for
 gets recomputed, and whatever it misses is served from cache. MACE overrides it to
 add `info`, because a MACE model can read `atoms.info` (total charge, total spin,
-external field) and ASE's own implementation looks only at numbers, positions,
+external field, electronic temperature) and ASE's own implementation looks only
+at numbers, positions,
 cell and pbc. So a change to a charge would otherwise return the previous energy.
 `MagneticMACECalculator` has its own override and its own test; this is the base
 one.
@@ -79,15 +80,23 @@ def calculator(model_path, **kwargs):
 # ---------------------------------------------------------------------------
 
 
-def test_the_default_info_keys_are_the_three_documented_ones(model_path):
-    """Stated here so removing one is a test failure rather than a silent change
-    in what the calculator reads off a structure."""
+def test_the_default_info_keys_are_the_four_documented_ones(model_path):
+    """Stated here so adding or removing one is a test failure rather than a
+    silent change in what the calculator reads off a structure.
+
+    `elec_temp` joined the defaults with Tel conditioning: a model carrying an
+    `elec_temp` embedding has to be able to read the temperature off a frame,
+    and putting it here rather than asking callers to pass `info_keys` avoids
+    the trap two tests below, where an override drops the entries it does not
+    restate.
+    """
     calc = calculator(model_path)
 
     assert calc.info_keys == {
         "total_spin": "spin",
         "total_charge": "charge",
         "external_field": "external_field",
+        "elec_temp": "elec_temp",
     }
 
 

@@ -10,7 +10,7 @@ import logging
 import os
 from glob import glob
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
@@ -31,6 +31,8 @@ from mace.tools.compile import (
 )
 from mace.tools.default_keys import DefaultKeys
 from mace.tools.scripts_utils import extract_model
+
+from .elec_temp import apply_default_elec_temp
 
 try:
     from mace.cli.convert_e3nn_cueq import run as run_e3nn_to_cueq
@@ -116,6 +118,7 @@ class MACECalculator(Calculator):
         eps_infty: float = None,
         electric_field_unit: float = 1.0,
         keep_neutral: bool = True,
+        elec_temp: Optional[float] = None,
         **kwargs,
     ):
         Calculator.__init__(self, **kwargs)
@@ -181,11 +184,14 @@ class MACECalculator(Calculator):
                 "total_spin": "spin",
                 "total_charge": "charge",
                 "external_field": "external_field",
+                "elec_temp": "elec_temp",
             }
         if arrays_keys is None:
             arrays_keys = {}
         self.info_keys = info_keys
         self.arrays_keys = arrays_keys
+        self.elec_temp = elec_temp
+        self._warned_missing_elec_temp = False
 
         self.model_type = model_type
         self.compute_atomic_stresses = False
@@ -591,6 +597,9 @@ class MACECalculator(Calculator):
         with torch_tools.default_dtype(self.default_dtype):
             config = mace_data.config_from_atoms(
                 atoms, key_specification=keyspec, head_name=self.head
+            )
+            self._warned_missing_elec_temp = apply_default_elec_temp(
+                config, self.elec_temp, self.models, self._warned_missing_elec_temp
             )
             real_graph = mace_data.AtomicData.from_config(
                 config,
